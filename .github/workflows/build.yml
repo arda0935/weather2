@@ -1,0 +1,51 @@
+# Automatically build the project and run any configured tests for every push
+# and submitted pull request. This can help catch issues that only occur on
+# certain platforms or Java versions, and provides a first line of defence
+# against bad commits.
+
+name: build
+on: [pull_request, push]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        # Use these Java versions
+        java: [
+          17,    # Current Java LTS & minimum supported by Minecraft
+        ]
+        # and run on both Linux and Windows
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checking Out the Repository
+        uses: actions/checkout@v3
+      - name: Validating the Gradle Wrapper
+        uses: gradle/wrapper-validation-action@v1
+      - name: Setting up Java ${{ matrix.java }}
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: ${{ matrix.java }}
+          java-package: jdk
+      - name: Setting Up the Gradle Wrapper
+        if: ${{ runner.os != 'Windows' }}
+        run: chmod +x ./gradlew
+      - name: Caching Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/loom-cache
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-#{{ hashFiles('**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      - name: Building
+        run: ./gradlew build
+      - name: Uploading the Build Artifacts
+        if: ${{ runner.os == 'Linux' && matrix.java == '17' }} # Only upload artifacts from Linux
+        uses: actions/upload-artifact@v3
+        with:
+          name: WildMod-Artifacts
+          path: build/libs/
